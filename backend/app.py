@@ -11,7 +11,13 @@ import os
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, origins="https://majetilahari-portfolio.vercel.app")
+CORS(
+    app,
+    origins=["https://majetilahari-portfolio.vercel.app"],
+    supports_credentials=False,
+    allow_headers=["Content-Type"],
+    methods=["POST", "OPTIONS"]
+)
 
 # -------------------------------
 # Vector DB & Embeddings
@@ -21,8 +27,6 @@ CHROMA_PATH = os.path.join(BASE_DIR, "chroma_db")
 
 chroma_client = chromadb.PersistentClient(path=CHROMA_PATH)
 collection = chroma_client.get_or_create_collection("portfolio")
-
-embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
 # -------------------------------
 # Hugging Face Mistral Client
@@ -125,10 +129,11 @@ def chat_stream():
 
         return Response(
             f"data:{text}\n\n",
-            mimetype="text/event-stream",
+            mimetype="text/event-stream; charset=utf-8",
             headers={
                 "Cache-Control": "no-cache",
-                "X-Accel-Buffering": "no"
+                "X-Accel-Buffering": "no",
+                "Access-Control-Allow-Origin": "https://majetilahari-portfolio.vercel.app"
             }
         )
 
@@ -147,4 +152,5 @@ def health():
     return {"status": "ok"}
 
 if __name__ == "__main__":
-    app.run()
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
