@@ -1,7 +1,6 @@
 from flask import Flask, request, Response
 from flask_cors import CORS
 import chromadb
-from sentence_transformers import SentenceTransformer
 from huggingface_hub import InferenceClient
 from dotenv import load_dotenv
 import os
@@ -77,12 +76,9 @@ ANSWER:
 # Retrieve Context
 # -------------------------------
 def retrieve_context(query, k=6):
-    query_emb = embedder.encode(query).tolist()
-
     results = collection.query(
-        query_embeddings=[query_emb],
-        n_results=k,
-        include=["documents"]
+        query_texts=[query],
+        n_results=k
     )
 
     docs = results.get("documents", [[]])[0]

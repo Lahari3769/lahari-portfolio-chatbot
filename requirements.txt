@@ -1,8 +1,6 @@
 flask
 flask-cors
 chromadb
-sentence-transformers
-requests
 huggingface-hub
 python-dotenv
 gunicorn
