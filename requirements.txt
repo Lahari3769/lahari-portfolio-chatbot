@@ -1,6 +1,6 @@
 flask
 flask-cors
-chromadb
-huggingface-hub
-python-dotenv
 gunicorn
+chromadb
+onnxruntime
+sentence-transformers
