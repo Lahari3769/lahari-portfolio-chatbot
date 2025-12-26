@@ -29,10 +29,11 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CHROMA_PATH = os.path.join(BASE_DIR, "chroma_db")
 
 chroma_client = chromadb.PersistentClient(path=CHROMA_PATH)
-collection = chroma_client.get_or_create_collection("portfolio")
-print("Warming up ChromaDB...")
-collection.count()
-print("ChromaDB ready")
+collection = chroma_client.get_or_create_collection(
+    name="portfolio",
+    embedding_function=None
+)
+
 
 # -------------------------------
 # Hugging Face Client
@@ -78,7 +79,8 @@ def add_cors_headers(resp):
 def retrieve_context(query, k=4):
     results = collection.query(
         query_texts=[query],
-        n_results=k
+        n_results=k,
+        include=["documents"]
     )
     docs = results.get("documents", [[]])[0]
     return "\n\n".join(docs) if docs else ""
