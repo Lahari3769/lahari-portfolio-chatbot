@@ -2,37 +2,24 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
 
-# ------------------------
-# App setup
-# ------------------------
 app = Flask(__name__)
 
 CORS(
     app,
     resources={r"/*": {"origins": "*"}},
-    supports_credentials=True,
 )
 
-# ------------------------
-# Load heavy stuff ONCE
-# ------------------------
 print("Loading vector DB and models...")
 
-from chroma_db import query_chroma  # example import
-# If you create embeddings / client, do it here ONCE
+# ✅ FIXED IMPORT
+from backend.chroma_db import query_chroma
 
 print("Backend ready")
 
-# ------------------------
-# Health check (Render)
-# ------------------------
 @app.route("/health", methods=["GET"])
 def health():
     return "ok", 200
 
-# ------------------------
-# Chat API (JSON, NOT stream)
-# ------------------------
 @app.route("/chat/stream", methods=["POST"])
 def chat():
     data = request.get_json()
@@ -43,11 +30,9 @@ def chat():
 
     try:
         answer = query_chroma(question)
-
         return jsonify({
             "answer": answer or "This information is not available in the portfolio."
         })
-
     except Exception as e:
         print("Chat error:", e)
         return jsonify({
