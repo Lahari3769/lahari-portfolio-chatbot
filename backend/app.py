@@ -3,7 +3,7 @@ from flask_cors import CORS
 import os
 
 # ✅ Import ONLY the query function (code)
-from backend.vector_store import query_chroma
+from vector_store import query_chroma
 
 app = Flask(__name__)
 
