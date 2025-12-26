@@ -11,7 +11,7 @@ import os
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, origins="*")
+CORS(app, origins="https://majetilahari-portfolio.vercel.app")
 
 # -------------------------------
 # Vector DB & Embeddings
