@@ -2,17 +2,15 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
 
+# ✅ Import ONLY the query function (code)
+from backend.vector_store import query_chroma
+
 app = Flask(__name__)
 
 CORS(
     app,
     resources={r"/*": {"origins": "*"}},
 )
-
-print("Loading vector DB and models...")
-
-# ✅ FIXED IMPORT
-from backend.chroma_db import query_chroma
 
 print("Backend ready")
 
