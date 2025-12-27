@@ -14,18 +14,7 @@ print("🔥 RUNNING THIS app.py FILE 🔥")
 load_dotenv()
 
 app = Flask(__name__)
-
-# ✅ PRODUCTION-SAFE CORS (Render + Vercel)
-CORS(
-    app,
-    resources={
-        r"/chat": {
-            "origins": [
-                "https://majetilahari-portfolio.vercel.app"
-            ]
-        }
-    }
-)
+CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"], "allow_headers": ["Content-Type"]}})
 
 print("Backend starting...")
 
@@ -42,27 +31,23 @@ print("✅ Vector store ready!")
 HF_API_URL = "https://router.huggingface.co/v1/chat/completions"
 HF_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN")
 
-def call_llm(prompt: str) -> str:
+def call_llm(prompt):
+    """Call Hugging Face API directly using requests"""
     headers = {
         "Authorization": f"Bearer {HF_TOKEN}",
         "Content-Type": "application/json"
     }
-
+    
     payload = {
         "model": "mistralai/Mistral-7B-Instruct-v0.2",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.3,
         "max_tokens": 500
     }
-
-    response = requests.post(
-        HF_API_URL,
-        headers=headers,
-        json=payload,
-        timeout=30
-    )
+    
+    response = requests.post(HF_API_URL, headers=headers, json=payload, timeout=30)
     response.raise_for_status()
-
+    
     return response.json()["choices"][0]["message"]["content"].strip()
 
 print("Backend ready")
@@ -108,10 +93,24 @@ ANSWER:
 """
 
 # -------------------------------
-# Chat Endpoint
+# Add CORS headers to all responses
 # -------------------------------
-@app.route("/chat", methods=["POST"])
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    return response
+
+# -------------------------------
+# Chat Endpoint (JSON – Render-safe)
+# -------------------------------
+@app.route("/chat", methods=["POST", "OPTIONS"])
 def chat():
+    # Handle preflight OPTIONS request
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+
     data = request.get_json(force=True)
     question = data.get("question", "").strip()
 
@@ -132,12 +131,13 @@ def chat():
 
     try:
         answer = call_llm(prompt)
+        
         return jsonify({
             "answer": answer or "This information is not available in the portfolio."
         })
 
     except Exception as e:
-        print(f"LLM ERROR: {type(e).__name__}: {e}")
+        print(f"LLM ERROR: {type(e).__name__}: {str(e)}")
         return jsonify({
             "answer": "Something went wrong on the server."
         }), 500
@@ -150,7 +150,7 @@ def health():
     return {"status": "ok"}
 
 # -------------------------------
-# Debug Routes
+# Debug: print routes AFTER registration
 # -------------------------------
 print("📍 Registered routes:")
 for rule in app.url_map.iter_rules():
