@@ -25,16 +25,8 @@ def add_cors_headers(response):
 
 print("Backend starting...")
 
-# -------------------------------
-# Pre-load Vector Store at Startup
-# -------------------------------
-print("🔄 Pre-loading vector store...")
-try:
-    from vector_store import retrieve_context
-    print("✅ Vector store ready!")
-except Exception as e:
-    print(f"❌ Vector store loading failed: {e}")
-    retrieve_context = None
+# Import retrieve_context (will be pre-loaded by wsgi.py)
+from vector_store import retrieve_context
 
 # -------------------------------
 # Hugging Face API Configuration
@@ -131,9 +123,6 @@ def chat():
         if not question:
             return jsonify({"answer": "Please ask a question."}), 400
 
-        if retrieve_context is None:
-            return jsonify({"answer": "Vector store not loaded. Please try again later."}), 503
-
         context = retrieve_context(question)
         print(f"📚 Context retrieved: {len(context) if context else 0} chars")
 
@@ -168,7 +157,7 @@ def chat():
 # -------------------------------
 @app.route("/health", methods=["GET"])
 def health():
-    return {"status": "ok", "vector_store": "loaded" if retrieve_context else "not_loaded"}
+    return {"status": "ok"}
 
 # -------------------------------
 # Root endpoint for testing
@@ -183,7 +172,3 @@ def root():
 print("📍 Registered routes:")
 for rule in app.url_map.iter_rules():
     print(f"  {rule}")
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
