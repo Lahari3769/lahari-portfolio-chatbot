@@ -19,6 +19,13 @@ CORS(app, origins="*")
 print("Backend starting...")
 
 # -------------------------------
+# Pre-load Vector Store at Startup
+# -------------------------------
+print("🔄 Pre-loading vector store...")
+from vector_store import retrieve_context
+print("✅ Vector store ready!")
+
+# -------------------------------
 # Hugging Face API Configuration
 # -------------------------------
 HF_API_URL = "https://router.huggingface.co/v1/chat/completions"
@@ -97,9 +104,6 @@ def chat():
         response.headers.add("Access-Control-Allow-Headers", "Content-Type")
         response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
         return response
-
-    # Lazy import to avoid Chroma init at boot
-    from vector_store import retrieve_context
 
     data = request.get_json(force=True)
     question = data.get("question", "").strip()
