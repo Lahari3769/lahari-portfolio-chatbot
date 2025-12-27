@@ -14,7 +14,18 @@ print("🔥 RUNNING THIS app.py FILE 🔥")
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, origins="*")
+
+# ✅ PRODUCTION-SAFE CORS (Render + Vercel)
+CORS(
+    app,
+    resources={
+        r"/chat": {
+            "origins": [
+                "https://majetilahari-portfolio.vercel.app"
+            ]
+        }
+    }
+)
 
 print("Backend starting...")
 
@@ -31,23 +42,27 @@ print("✅ Vector store ready!")
 HF_API_URL = "https://router.huggingface.co/v1/chat/completions"
 HF_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN")
 
-def call_llm(prompt):
-    """Call Hugging Face API directly using requests"""
+def call_llm(prompt: str) -> str:
     headers = {
         "Authorization": f"Bearer {HF_TOKEN}",
         "Content-Type": "application/json"
     }
-    
+
     payload = {
         "model": "mistralai/Mistral-7B-Instruct-v0.2",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.3,
         "max_tokens": 500
     }
-    
-    response = requests.post(HF_API_URL, headers=headers, json=payload, timeout=30)
+
+    response = requests.post(
+        HF_API_URL,
+        headers=headers,
+        json=payload,
+        timeout=30
+    )
     response.raise_for_status()
-    
+
     return response.json()["choices"][0]["message"]["content"].strip()
 
 print("Backend ready")
@@ -93,18 +108,10 @@ ANSWER:
 """
 
 # -------------------------------
-# Chat Endpoint (JSON – Render-safe)
+# Chat Endpoint
 # -------------------------------
-@app.route("/chat", methods=["POST", "OPTIONS"])
+@app.route("/chat", methods=["POST"])
 def chat():
-    # Handle preflight OPTIONS request
-    if request.method == "OPTIONS":
-        response = jsonify({"status": "ok"})
-        response.headers.add("Access-Control-Allow-Origin", "*")
-        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
-        response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
-        return response
-
     data = request.get_json(force=True)
     question = data.get("question", "").strip()
 
@@ -125,13 +132,12 @@ def chat():
 
     try:
         answer = call_llm(prompt)
-        
         return jsonify({
             "answer": answer or "This information is not available in the portfolio."
         })
 
     except Exception as e:
-        print(f"LLM ERROR: {type(e).__name__}: {str(e)}")
+        print(f"LLM ERROR: {type(e).__name__}: {e}")
         return jsonify({
             "answer": "Something went wrong on the server."
         }), 500
@@ -144,7 +150,7 @@ def health():
     return {"status": "ok"}
 
 # -------------------------------
-# Debug: print routes AFTER registration
+# Debug Routes
 # -------------------------------
 print("📍 Registered routes:")
 for rule in app.url_map.iter_rules():
