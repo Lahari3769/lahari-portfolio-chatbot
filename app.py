@@ -7,6 +7,10 @@ from dotenv import load_dotenv
 
 print("🔥 RUNNING THIS app.py FILE 🔥")
 
+# Set HuggingFace cache to persistent location
+os.environ["HF_HOME"] = "/opt/render/project/.cache/huggingface"
+os.environ["TRANSFORMERS_CACHE"] = "/opt/render/project/.cache/huggingface"
+
 # -------------------------------
 # App Setup
 # -------------------------------
@@ -14,7 +18,7 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Manual CORS - more reliable than flask-cors
+# Manual CORS
 @app.after_request
 def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
@@ -25,7 +29,7 @@ def add_cors_headers(response):
 
 print("Backend starting...")
 
-# Import retrieve_context (will be pre-loaded by wsgi.py)
+# Import retrieve_context (lazy loads)
 from vector_store import retrieve_context
 
 # -------------------------------
@@ -56,7 +60,7 @@ def call_llm(prompt):
 print("Backend ready")
 
 # -------------------------------
-# SYSTEM PROMPT (Grounded RAG)
+# SYSTEM PROMPT
 # -------------------------------
 SYSTEM_PROMPT = """
 You are an AI assistant for the portfolio of Majeti Lahari.
@@ -96,7 +100,7 @@ ANSWER:
 """
 
 # -------------------------------
-# Explicit OPTIONS handler for ALL routes
+# OPTIONS handler
 # -------------------------------
 @app.route('/', defaults={'path': ''}, methods=['OPTIONS'])
 @app.route('/<path:path>', methods=['OPTIONS'])
@@ -104,13 +108,12 @@ def handle_options(path):
     return '', 204
 
 # -------------------------------
-# Chat Endpoint (JSON – Render-safe)
+# Chat Endpoint
 # -------------------------------
 @app.route("/chat", methods=["POST", "OPTIONS"])
 def chat():
     print(f"📨 Received {request.method} request to /chat")
     
-    # Handle preflight OPTIONS request
     if request.method == "OPTIONS":
         print("✅ OPTIONS request handled")
         return '', 204
@@ -123,6 +126,7 @@ def chat():
         if not question:
             return jsonify({"answer": "Please ask a question."}), 400
 
+        print("🔍 Retrieving context...")
         context = retrieve_context(question)
         print(f"📚 Context retrieved: {len(context) if context else 0} chars")
 
@@ -131,26 +135,19 @@ def chat():
                 "answer": "This information is not available in the portfolio."
             })
 
-        prompt = SYSTEM_PROMPT.format(
-            context=context,
-            question=question
-        )
+        prompt = SYSTEM_PROMPT.format(context=context, question=question)
 
         print("🤖 Calling LLM...")
         answer = call_llm(prompt)
         print(f"✅ Answer generated: {len(answer)} chars")
         
-        return jsonify({
-            "answer": answer or "This information is not available in the portfolio."
-        })
+        return jsonify({"answer": answer or "This information is not available in the portfolio."})
 
     except Exception as e:
-        print(f"❌ LLM ERROR: {type(e).__name__}: {str(e)}")
+        print(f"❌ ERROR: {type(e).__name__}: {str(e)}")
         import traceback
         traceback.print_exc()
-        return jsonify({
-            "answer": "Something went wrong on the server."
-        }), 500
+        return jsonify({"answer": "Something went wrong on the server."}), 500
 
 # -------------------------------
 # Health Check
@@ -160,15 +157,12 @@ def health():
     return {"status": "ok"}
 
 # -------------------------------
-# Root endpoint for testing
+# Root endpoint
 # -------------------------------
 @app.route("/", methods=["GET"])
 def root():
     return {"message": "Lahari Portfolio Chatbot API", "status": "running"}
 
-# -------------------------------
-# Debug: print routes AFTER registration
-# -------------------------------
 print("📍 Registered routes:")
 for rule in app.url_map.iter_rules():
     print(f"  {rule}")
