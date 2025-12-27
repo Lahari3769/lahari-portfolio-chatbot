@@ -2,7 +2,6 @@ import os
 os.environ["ANONYMIZED_TELEMETRY"] = "False"
 
 from flask import Flask, request, jsonify
-from flask_cors import CORS
 import requests
 from dotenv import load_dotenv
 
@@ -14,7 +13,15 @@ print("🔥 RUNNING THIS app.py FILE 🔥")
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"], "allow_headers": ["Content-Type"]}})
+
+# Manual CORS - more reliable than flask-cors
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, PUT, DELETE'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+    response.headers['Access-Control-Max-Age'] = '3600'
+    return response
 
 print("Backend starting...")
 
@@ -22,8 +29,12 @@ print("Backend starting...")
 # Pre-load Vector Store at Startup
 # -------------------------------
 print("🔄 Pre-loading vector store...")
-from vector_store import retrieve_context
-print("✅ Vector store ready!")
+try:
+    from vector_store import retrieve_context
+    print("✅ Vector store ready!")
+except Exception as e:
+    print(f"❌ Vector store loading failed: {e}")
+    retrieve_context = None
 
 # -------------------------------
 # Hugging Face API Configuration
@@ -93,51 +104,61 @@ ANSWER:
 """
 
 # -------------------------------
-# Add CORS headers to all responses
+# Explicit OPTIONS handler for ALL routes
 # -------------------------------
-@app.after_request
-def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
-    return response
+@app.route('/', defaults={'path': ''}, methods=['OPTIONS'])
+@app.route('/<path:path>', methods=['OPTIONS'])
+def handle_options(path):
+    return '', 204
 
 # -------------------------------
 # Chat Endpoint (JSON – Render-safe)
 # -------------------------------
 @app.route("/chat", methods=["POST", "OPTIONS"])
 def chat():
+    print(f"📨 Received {request.method} request to /chat")
+    
     # Handle preflight OPTIONS request
     if request.method == "OPTIONS":
-        return jsonify({"status": "ok"}), 200
-
-    data = request.get_json(force=True)
-    question = data.get("question", "").strip()
-
-    if not question:
-        return jsonify({"answer": "Please ask a question."}), 400
-
-    context = retrieve_context(question)
-
-    if not context:
-        return jsonify({
-            "answer": "This information is not available in the portfolio."
-        })
-
-    prompt = SYSTEM_PROMPT.format(
-        context=context,
-        question=question
-    )
+        print("✅ OPTIONS request handled")
+        return '', 204
 
     try:
+        data = request.get_json(force=True)
+        question = data.get("question", "").strip()
+        print(f"❓ Question: {question}")
+
+        if not question:
+            return jsonify({"answer": "Please ask a question."}), 400
+
+        if retrieve_context is None:
+            return jsonify({"answer": "Vector store not loaded. Please try again later."}), 503
+
+        context = retrieve_context(question)
+        print(f"📚 Context retrieved: {len(context) if context else 0} chars")
+
+        if not context:
+            return jsonify({
+                "answer": "This information is not available in the portfolio."
+            })
+
+        prompt = SYSTEM_PROMPT.format(
+            context=context,
+            question=question
+        )
+
+        print("🤖 Calling LLM...")
         answer = call_llm(prompt)
+        print(f"✅ Answer generated: {len(answer)} chars")
         
         return jsonify({
             "answer": answer or "This information is not available in the portfolio."
         })
 
     except Exception as e:
-        print(f"LLM ERROR: {type(e).__name__}: {str(e)}")
+        print(f"❌ LLM ERROR: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             "answer": "Something went wrong on the server."
         }), 500
@@ -145,16 +166,23 @@ def chat():
 # -------------------------------
 # Health Check
 # -------------------------------
-@app.route("/health")
+@app.route("/health", methods=["GET"])
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "vector_store": "loaded" if retrieve_context else "not_loaded"}
+
+# -------------------------------
+# Root endpoint for testing
+# -------------------------------
+@app.route("/", methods=["GET"])
+def root():
+    return {"message": "Lahari Portfolio Chatbot API", "status": "running"}
 
 # -------------------------------
 # Debug: print routes AFTER registration
 # -------------------------------
 print("📍 Registered routes:")
 for rule in app.url_map.iter_rules():
-    print(rule)
+    print(f"  {rule}")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
