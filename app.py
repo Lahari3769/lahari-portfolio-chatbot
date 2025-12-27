@@ -3,7 +3,7 @@ os.environ["ANONYMIZED_TELEMETRY"] = "False"
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from huggingface_hub import InferenceClient
+import requests
 from dotenv import load_dotenv
 
 print("🔥 RUNNING THIS app.py FILE 🔥")
@@ -19,20 +19,29 @@ CORS(app, origins="*")
 print("Backend starting...")
 
 # -------------------------------
-# Lazy Hugging Face Client (memory-safe)
+# Hugging Face API Configuration
 # -------------------------------
-_llm_client = None
+HF_API_URL = "https://router.huggingface.co/v1/chat/completions"
+HF_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN")
 
-def get_llm():
-    global _llm_client
-    if _llm_client is None:
-        print("Loading Hugging Face LLM...")
-        # Remove base_url - newer huggingface_hub handles this automatically
-        _llm_client = InferenceClient(
-            model="mistralai/Mistral-7B-Instruct-v0.2",
-            token=os.getenv("HUGGINGFACEHUB_API_TOKEN")
-        )
-    return _llm_client
+def call_llm(prompt):
+    """Call Hugging Face API directly using requests"""
+    headers = {
+        "Authorization": f"Bearer {HF_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": "mistralai/Mistral-7B-Instruct-v0.2",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.3,
+        "max_tokens": 500
+    }
+    
+    response = requests.post(HF_API_URL, headers=headers, json=payload, timeout=30)
+    response.raise_for_status()
+    
+    return response.json()["choices"][0]["message"]["content"].strip()
 
 print("Backend ready")
 
@@ -111,14 +120,8 @@ def chat():
     )
 
     try:
-        response = get_llm().chat_completion(
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3,
-            max_tokens=500
-        )
-
-        answer = response.choices[0].message.content.strip()
-
+        answer = call_llm(prompt)
+        
         return jsonify({
             "answer": answer or "This information is not available in the portfolio."
         })
