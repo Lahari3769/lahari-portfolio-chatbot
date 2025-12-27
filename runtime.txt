@@ -1,1 +1,13 @@
-python-3.11.11
+python-3.11.9
+```
+
+## Verify your repository structure:
+```
+lahari-portfolio-chatbot/
+├── app.py
+├── vector_store.py
+├── requirements.txt
+├── runtime.txt          ← Must be here at root level
+├── .env (optional)
+└── other files...
+```
