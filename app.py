@@ -27,10 +27,10 @@ def get_llm():
     global _llm_client
     if _llm_client is None:
         print("Loading Hugging Face LLM...")
+        # Remove base_url - newer huggingface_hub handles this automatically
         _llm_client = InferenceClient(
             model="mistralai/Mistral-7B-Instruct-v0.2",
-            token=os.getenv("HUGGINGFACEHUB_API_TOKEN"),
-            base_url="https://router.huggingface.co/v1"
+            token=os.getenv("HUGGINGFACEHUB_API_TOKEN")
         )
     return _llm_client
 
@@ -114,8 +114,7 @@ def chat():
         response = get_llm().chat_completion(
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
-            max_tokens=500,
-            timeout=30
+            max_tokens=500
         )
 
         answer = response.choices[0].message.content.strip()
