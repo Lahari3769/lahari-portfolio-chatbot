@@ -1,0 +1,4 @@
+chatbot-venv
+.env
+.python-version
+ingest.py
