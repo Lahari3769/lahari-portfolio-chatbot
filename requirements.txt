@@ -4,4 +4,5 @@ python-dotenv==1.0.0
 requests==2.31.0
 sentence-transformers==2.2.2
 chromadb==0.4.22
+numpy<2.0.0
 gunicorn==21.2.0
