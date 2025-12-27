@@ -29,7 +29,8 @@ def get_llm():
         print("Loading Hugging Face LLM...")
         _llm_client = InferenceClient(
             model="mistralai/Mistral-7B-Instruct-v0.2",
-            token=os.getenv("HUGGINGFACEHUB_API_TOKEN")
+            token=os.getenv("HUGGINGFACEHUB_API_TOKEN"),
+            base_url="https://router.huggingface.co/v1"
         )
     return _llm_client
 
@@ -78,8 +79,16 @@ ANSWER:
 # -------------------------------
 # Chat Endpoint (JSON – Render-safe)
 # -------------------------------
-@app.route("/chat", methods=["POST"])
+@app.route("/chat", methods=["POST", "OPTIONS"])
 def chat():
+    # Handle preflight OPTIONS request
+    if request.method == "OPTIONS":
+        response = jsonify({"status": "ok"})
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
+        return response
+
     # Lazy import to avoid Chroma init at boot
     from vector_store import retrieve_context
 
@@ -105,7 +114,8 @@ def chat():
         response = get_llm().chat_completion(
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
-            max_tokens=500
+            max_tokens=500,
+            timeout=30
         )
 
         answer = response.choices[0].message.content.strip()
@@ -115,7 +125,7 @@ def chat():
         })
 
     except Exception as e:
-        print("LLM ERROR:", e)
+        print(f"LLM ERROR: {type(e).__name__}: {str(e)}")
         return jsonify({
             "answer": "Something went wrong on the server."
         }), 500
